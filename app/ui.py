@@ -79,7 +79,7 @@ async def agent_loop(tools: dict, llm_client: AsyncOpenAI|AsyncAzureOpenAI, mess
             )
 
             with st.chat_message("assistant"):
-                st.markdown(f"""Using tool:```{tool_call.function.name}({arguments}```to answer this question.""")
+                st.markdown(f"""Using tool:```{tool_call.function.name}({arguments})```to answer this question.""")
 
             # with st.chat_message("assistant"):
             #     st.markdown(f"Tool response: {tool_result}")
@@ -87,7 +87,7 @@ async def agent_loop(tools: dict, llm_client: AsyncOpenAI|AsyncAzureOpenAI, mess
             messages.append(
                 {
                     "role": "assistant",
-                    "content": f"""Using tool:```{tool_call.function.name}({arguments}```to answer this question."""
+                    "content": f"""Using tool:```{tool_call.function.name}({arguments})```to answer this question."""
                 }
             )
 

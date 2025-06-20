@@ -1,13 +1,12 @@
-import asyncio
-
-import streamlit as st
 from dotenv import load_dotenv
+load_dotenv()
 
+import asyncio
+import streamlit as st
 from app.ui import ui
 from client import MCPClient
 from servers.servers_list import server_list
 
-load_dotenv()
 
 st.set_page_config(layout="wide", page_title="Streamlit Client for an MCP server")
 
