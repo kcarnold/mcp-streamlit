@@ -37,6 +37,9 @@ async def main():
                 }
                 for tool in mcp_tools.tools
             }
+            # Reset conversation when tools change
+            if "conversation" in st.session_state:
+                del st.session_state.conversation
             # Available Tools
             if "tools" in st.session_state and st.session_state['tools'] is not None and len(
                     st.session_state['tools']) > 0:

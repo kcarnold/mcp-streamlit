@@ -1,28 +1,58 @@
-import json
 import os
 from typing import List
 
 import streamlit as st
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
-from openai.lib.azure import AsyncAzureOpenAI
+import llm
 
 load_dotenv()
 
-# gpt_client = AsyncOpenAI(
-#     api_key=os.getenv("OPENAI_API_KEY")
-# )
+# Initialize the LLM model
+model = llm.get_async_model("github/gpt-5-nano")
 
-gpt_client = AsyncAzureOpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("OPENAI_API_VERSION"),
-    azure_deployment="gpt-4o-mini",
-)
+# Make an example request
+response = model.prompt("Greet me in 5 languages.")
+print(response.text())
+
+
+def create_conversation():
+    """Create a new conversation with tools from session state"""
+    if "tools" not in st.session_state or not st.session_state.tools:
+        return model.conversation()
+
+    # Create tool functions for the LLM library
+    tool_functions = []
+
+    # Add each MCP tool as a function
+    for tool_name, tool_info in st.session_state.tools.items():
+        # Create a wrapper function for the MCP tool
+        def create_tool_wrapper(tool_callable, tool_name):
+            async def tool_wrapper(**kwargs):
+                with st.chat_message("assistant"):
+                    st.markdown(f"""Using tool: `{tool_name}({kwargs})` to answer this question.""")
+                    result = await tool_callable(**kwargs)
+                    st.markdown(f"""Got result from tool `{tool_name}`:""")
+                    st.markdown(f"```\n{result}\n```")
+                return result
+
+            # Set function attributes for LLM library
+            tool_wrapper.__name__ = tool_name
+            tool_wrapper.__doc__ = f"MCP tool: {tool_name}"
+            return tool_wrapper
+
+        # Add the wrapped tool to our tools list
+        wrapped_tool = create_tool_wrapper(tool_info["callable"], tool_name)
+        tool_functions.append(wrapped_tool)
+
+    # Create conversation with tools
+    return model.conversation(tools=tool_functions)
 
 async def ui():
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    if "conversation" not in st.session_state:
+        st.session_state.conversation = create_conversation()
 
     for message in st.session_state.messages:
         # skip tool calls
@@ -38,72 +68,23 @@ async def ui():
             st.markdown(prompt)
 
         with st.spinner("Thinking..."):
-            response, messages = await agent_loop(st.session_state.tools, gpt_client, st.session_state.messages)
-            st.session_state.messages = messages
+            response = await agent_loop(st.session_state.conversation, st.session_state.messages)
+            st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"):
                 st.markdown(response)
 
 
-async def agent_loop(tools: dict, llm_client: AsyncOpenAI|AsyncAzureOpenAI, messages: List[dict]):
-    first_response = await llm_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        tools=([t["schema"] for t in tools.values()] if len(tools) > 0 else None),
-        temperature=0,
-    )
+async def agent_loop(conversation, messages: List[dict]):
+    # Get the latest user message
+    latest_user_msg = None
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            latest_user_msg = msg["content"]
+            break
 
-    stop_reason = (
-        "tool_calls"
-        if first_response.choices[0].message.tool_calls is not None
-        else first_response.choices[0].finish_reason
-    )
+    if latest_user_msg:
+        # Use the LLM library's built-in tool calling mechanism
+        response = conversation.prompt(latest_user_msg)
+        return response.text()
 
-    if stop_reason == "tool_calls":
-        for tool_call in first_response.choices[0].message.tool_calls:
-            arguments = (
-                json.loads(tool_call.function.arguments)
-                if isinstance(tool_call.function.arguments, str)
-                else tool_call.function.arguments
-            )
-            tool_result = await tools[tool_call.function.name]["callable"](**arguments)
-            messages.append(
-                first_response.choices[0].message.to_dict()
-            )
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": tool_call.function.name,
-                    "content": json.dumps(tool_result),
-                }
-            )
-
-            with st.chat_message("assistant"):
-                st.markdown(f"""Using tool:```{tool_call.function.name}({arguments})```to answer this question.""")
-
-            # with st.chat_message("assistant"):
-            #     st.markdown(f"Tool response: {tool_result}")
-
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": f"""Using tool:```{tool_call.function.name}({arguments})```to answer this question."""
-                }
-            )
-
-        new_response = await llm_client.chat.completions.create(
-            model="gpt-40-mini",
-            messages=messages,
-        )
-
-    elif stop_reason == "stop":
-        new_response = first_response
-
-    else:
-        raise ValueError(f"Unknown stop reason: {stop_reason}")
-
-    messages.append(
-        {"role": "assistant", "content": new_response.choices[0].message.content}
-    )
-
-    return new_response.choices[0].message.content, messages
+    return "No user message found to respond to."

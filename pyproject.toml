@@ -3,8 +3,9 @@ name = "mcp-streamlit"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "llm>=0.27.1",
+    "llm-github-models>=0.18.0",
     "mcp>=1.15.0",
-    "openai>=1.109.1",
     "python-dotenv>=1.1.1",
     "streamlit>=1.50.0",
     "watchdog>=6.0.0",
