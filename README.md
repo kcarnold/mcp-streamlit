@@ -8,24 +8,7 @@ Interactive Streamlit app for chatting with LLMs via **Model Context Protocol (M
 ```bash
 git clone https://github.com/talrejanikhil/mcp-streamlit.git
 cd mcp-streamlit
-
-python -m venv venv
-source venv/bin/activate       # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Or with Poetry:
-
-```bash
-poetry install
-```
-
-### Run
-
-**Locally**:
-
-```bash
-streamlit run app/streamlit_app.py
+uv run streamlit run app/streamlit_app.py
 ```
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.

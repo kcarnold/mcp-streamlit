@@ -3,7 +3,7 @@ load_dotenv()
 
 import asyncio
 import streamlit as st
-from app.ui import ui
+from ui import ui
 from client import MCPClient
 from servers.servers_list import server_list
 
