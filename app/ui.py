@@ -10,6 +10,10 @@ load_dotenv()
 # Initialize the LLM model
 model = llm.get_async_model("github/gpt-5-nano")
 
+# Make an example request
+response = model.prompt("Greet me in 5 languages.")
+print(response.text())
+
 
 def create_conversation():
     """Create a new conversation with tools from session state"""
@@ -25,10 +29,8 @@ def create_conversation():
         def create_tool_wrapper(tool_callable, tool_name):
             async def tool_wrapper(**kwargs):
                 with st.chat_message("assistant"):
-                    print(f"Calling tool {tool_name} with args {kwargs}")
                     st.markdown(f"""Using tool: `{tool_name}({kwargs})` to answer this question.""")
                     result = await tool_callable(**kwargs)
-                    print(f"Result from tool {tool_name}: {result}")
                     st.markdown(f"""Got result from tool `{tool_name}`:""")
                     st.markdown(f"```\n{result}\n```")
                 return result
@@ -43,7 +45,6 @@ def create_conversation():
         tool_functions.append(wrapped_tool)
 
     # Create conversation with tools
-    print(f"Creating conversation with tools: {[tool.__name__ for tool in tool_functions]}")
     return model.conversation(tools=tool_functions)
 
 async def ui():
@@ -52,8 +53,6 @@ async def ui():
 
     if "conversation" not in st.session_state:
         st.session_state.conversation = create_conversation()
-
-    conversation: llm.AsyncConversation = st.session_state.conversation
 
     for message in st.session_state.messages:
         # skip tool calls
@@ -69,9 +68,23 @@ async def ui():
             st.markdown(prompt)
 
         with st.spinner("Thinking..."):
-            response = conversation.chain(prompt)
-            text = await response.text()
-            st.session_state.messages.append({"role": "assistant", "content": text})
+            response = await agent_loop(st.session_state.conversation, st.session_state.messages)
+            st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"):
-                st.markdown(text)
+                st.markdown(response)
 
+
+async def agent_loop(conversation, messages: List[dict]):
+    # Get the latest user message
+    latest_user_msg = None
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            latest_user_msg = msg["content"]
+            break
+
+    if latest_user_msg:
+        # Use the LLM library's built-in tool calling mechanism
+        response = conversation.prompt(latest_user_msg)
+        return response.text()
+
+    return "No user message found to respond to."
