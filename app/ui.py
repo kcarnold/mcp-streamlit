@@ -9,16 +9,19 @@ from openai.lib.azure import AsyncAzureOpenAI
 
 load_dotenv()
 
-# gpt_client = AsyncOpenAI(
-#     api_key=os.getenv("OPENAI_API_KEY")
-# )
-
-gpt_client = AsyncAzureOpenAI(
+gpt_client = AsyncOpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("OPENAI_API_VERSION"),
-    azure_deployment="gpt-4o-mini",
+    base_url=os.getenv("OPENAI_BASE_URL"),
 )
+
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash-lite")
+
+# gpt_client = AsyncAzureOpenAI(
+#     api_key=os.getenv("OPENAI_API_KEY"),
+#     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+#     api_version=os.getenv("OPENAI_API_VERSION"),
+#     azure_deployment="gpt-4o-mini",
+# )
 
 async def ui():
     if "messages" not in st.session_state:
@@ -46,10 +49,10 @@ async def ui():
 
 async def agent_loop(tools: dict, llm_client: AsyncOpenAI|AsyncAzureOpenAI, messages: List[dict]):
     first_response = await llm_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=MODEL_NAME,
         messages=messages,
         tools=([t["schema"] for t in tools.values()] if len(tools) > 0 else None),
-        temperature=0,
+        reasoning_effort="low",
     )
 
     stop_reason = (
